@@ -401,16 +401,16 @@ export async function discoverSearch(
   const startTime = Date.now()
   const results: DiscoverSearchResult[] = []
 
-  if (platform === 'all') {
-    const local = await collectLocalResults(query, rsshubInstance)
-    results.push(...local)
-  }
-
-  await runPlatformProbes(query, rsshubInstance, platform, results)
-  appendProfileResolutionCandidates(query, rsshubInstance, platform, results)
-
   if (looksLikeDirectUrl(query, platform)) {
     await appendDirectUrlResult(query, rsshubInstance, results)
+  } else {
+    if (platform === 'all') {
+      const local = await collectLocalResults(query, rsshubInstance)
+      results.push(...local)
+    }
+
+    await runPlatformProbes(query, rsshubInstance, platform, results)
+    appendProfileResolutionCandidates(query, rsshubInstance, platform, results)
   }
 
   const finalResults = dedupeAndSortDiscoverResults(query, results)

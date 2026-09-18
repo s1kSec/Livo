@@ -76,13 +76,17 @@ describe('discoverSearch', () => {
     expect(probeInstagramUsersByKeyword).not.toHaveBeenCalled()
   })
 
-  it('does not invoke the cloud WeChat search in the local build', async () => {
-    await discoverSearch(
-      'http://pub.kb.fortinet.com/rss/firmware.xml',
-      'all',
-      'https://rsshub.app',
-    )
+  it('handles explicit RSS URLs without platform probes', async () => {
+    const url = 'https://pub.kb.fortinet.com/rss/firmware.xml'
+    const results = await discoverSearch(url, 'all', 'https://rsshub.app')
 
+    expect(results).toEqual(
+      expect.arrayContaining([expect.objectContaining({ source: 'url', url })]),
+    )
+    expect(searchYouTubeChannelsByKeyword).not.toHaveBeenCalled()
+    expect(probeBilibiliUsersByKeyword).not.toHaveBeenCalled()
+    expect(probeXUsersByKeyword).not.toHaveBeenCalled()
+    expect(probeInstagramUsersByKeyword).not.toHaveBeenCalled()
     expect(searchWechatMp).not.toHaveBeenCalled()
   })
 
