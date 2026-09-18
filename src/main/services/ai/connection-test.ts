@@ -19,7 +19,10 @@ export interface ConnectionTestResult {
   modelInfo?: string
 }
 
-const TEST_PROMPT = '简短告诉我你是什么公司的什么模型、是什么版本，不超过15个字'
+// Connection probes should ask for a deterministic, minimal visible answer.
+// Some OpenAI-compatible reasoning models spend their entire response budget
+// on an identity/version question and return no `message.content`.
+const TEST_PROMPT = 'Reply with OK'
 const MAX_TOKENS = 256
 const MAX_ATTEMPTS = 2
 
