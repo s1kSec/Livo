@@ -46,6 +46,7 @@ const { probeBilibiliUsersByKeyword } = await import('./discover-bilibili')
 const { probeXUsersByKeyword } = await import('./discover-x')
 const { probeInstagramUsersByKeyword } =
   await import('./discover-instagram-search')
+const { searchWechatMp } = await import('./wechat-mp-client')
 
 describe('discoverSearch', () => {
   beforeEach(() => {
@@ -73,6 +74,16 @@ describe('discoverSearch', () => {
     expect(probeBilibiliUsersByKeyword).not.toHaveBeenCalled()
     expect(probeXUsersByKeyword).toHaveBeenCalledTimes(1)
     expect(probeInstagramUsersByKeyword).not.toHaveBeenCalled()
+  })
+
+  it('does not invoke the cloud WeChat search in the local build', async () => {
+    await discoverSearch(
+      'http://pub.kb.fortinet.com/rss/firmware.xml',
+      'all',
+      'https://rsshub.app',
+    )
+
+    expect(searchWechatMp).not.toHaveBeenCalled()
   })
 
   it('caches results across calls with identical query+platform', async () => {

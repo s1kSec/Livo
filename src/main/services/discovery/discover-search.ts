@@ -38,6 +38,7 @@ import {
 import { probeBilibiliUsersByKeyword } from './discover-bilibili'
 import { probeInstagramUsersByKeyword } from './discover-instagram-search'
 import { searchWechatMp } from './wechat-mp-client'
+import { IS_LOCAL_BUILD } from '../../../shared/local-mode'
 
 export type DiscoverSearchPlatform =
   | 'all'
@@ -250,7 +251,7 @@ async function runPlatformProbes(
     )
   }
 
-  if (platform === 'all' || platform === 'wechat-mp') {
+  if (!IS_LOCAL_BUILD && (platform === 'all' || platform === 'wechat-mp')) {
     searchPromises.push(
       searchWechatMp(query, { limit: 10, offset: 0 }).then((payload) => {
         logInfo(
