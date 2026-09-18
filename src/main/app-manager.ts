@@ -51,6 +51,11 @@ import { WebSocketService } from './services/websocket'
 import { registerWebSocketHandlers } from './handlers/websocket-handlers'
 import { registerNotificationHandlers } from './handlers/notification-handlers'
 import { getBackendBaseUrl } from './services/backend/backend-config'
+import {
+  IS_LOCAL_BUILD,
+  LOCAL_APP_ID,
+  LOCAL_PROTOCOL,
+} from '../shared/local-mode'
 
 // 自动刷新会触发同步 SQLite 写事务并阻塞主进程 IPC；启动后的前几秒是
 // 用户交互最密集的窗口期，延后到首屏数据与交互稳定之后再开始。
@@ -90,7 +95,9 @@ export class AppManager {
   }
 
   handleSecondInstance(argv: string[]): void {
-    const protocolArg = argv.find((arg) => /^livo:\/\//i.test(arg))
+    const protocolArg = argv.find((arg) =>
+      new RegExp(`^${LOCAL_PROTOCOL}:\\/\\/`, 'i').test(arg),
+    )
     if (protocolArg) {
       this.dispatchDeepLink(protocolArg)
     }
@@ -103,7 +110,9 @@ export class AppManager {
   }
 
   handleInitialArgv(argv: string[]): void {
-    const protocolArg = argv.find((arg) => /^livo:\/\//i.test(arg))
+    const protocolArg = argv.find((arg) =>
+      new RegExp(`^${LOCAL_PROTOCOL}:\\/\\/`, 'i').test(arg),
+    )
     if (protocolArg) {
       this.dispatchDeepLink(protocolArg)
     }
@@ -122,9 +131,11 @@ export class AppManager {
     // 提前注册 IPC，窗口加载后可以立刻调用启动接口。
     this.registerIpcHandlers()
     registerAppHandlers(this.windowManager, this.updater)
-    registerUpdaterHandlers(this.updater)
-    registerWebSocketHandlers(this.websocket)
-    registerNotificationHandlers()
+    if (!IS_LOCAL_BUILD) {
+      registerUpdaterHandlers(this.updater)
+      registerWebSocketHandlers(this.websocket)
+      registerNotificationHandlers()
+    }
 
     // 先创建窗口，再等待数据库初始化；renderer HTML 和骨架屏可以更早加载。
     const mainWindow = this.windowManager.createMainWindow()
@@ -204,10 +215,10 @@ export class AppManager {
 
   private configurePlatformIntegration(): void {
     if (process.platform === 'win32') {
-      app.setAppUserModelId('com.livospace.cn')
+      app.setAppUserModelId(LOCAL_APP_ID)
     }
     if (app.isPackaged) {
-      app.setAsDefaultProtocolClient('livo')
+      app.setAsDefaultProtocolClient(LOCAL_PROTOCOL)
     }
   }
 
@@ -225,7 +236,7 @@ export class AppManager {
 
   private registerIpcHandlers(): void {
     registerFeedHandlers()
-    registerFeedSyncHandlers()
+    if (!IS_LOCAL_BUILD) registerFeedSyncHandlers()
     registerEntryHandlers()
     registerReaderHandlers()
     registerAIHandlers()
@@ -233,14 +244,16 @@ export class AppManager {
     registerReadabilityHandlers()
     registerDiscoverHandlers()
     registerVideoHandlers()
-    registerAccountHandlers()
+    if (!IS_LOCAL_BUILD) registerAccountHandlers()
     registerAgentHandlers()
     registerActionHandlers()
     registerFeverHandlers()
     registerTaskHandlers()
-    registerAuthHandlers()
-    registerWechatMpHandlers()
-    registerReadingActivityHandlers()
+    if (!IS_LOCAL_BUILD) {
+      registerAuthHandlers()
+      registerWechatMpHandlers()
+      registerReadingActivityHandlers()
+    }
   }
 
   private createTray(): void {
@@ -253,11 +266,6 @@ export class AppManager {
         this.windowManager.sendAppCommand({
           type: 'open-settings',
           tab: 'general',
-        }),
-      checkForUpdates: () =>
-        this.windowManager.sendAppCommand({
-          type: 'open-settings',
-          tab: 'about',
         }),
       quit: () => {
         this.windowManager.prepareForQuit()
@@ -292,9 +300,11 @@ export class AppManager {
       // 免登录启动时不会触发登录后同步，这里在会话有效时主动对账一次，
       // 把云端订阅补齐到本地（修复"云端有、本地 0 条"需重新登录才能恢复的问题）。
       // 即使 session 过期也尝试同步——本地有缓存 token 时仍可拉取云端订阅快照。
-      feedSyncService.syncNow().catch((error) => {
-        logError('[startup-feed-sync-failed]', error)
-      })
+      if (!IS_LOCAL_BUILD) {
+        feedSyncService.syncNow().catch((error) => {
+          logError('[startup-feed-sync-failed]', error)
+        })
+      }
     }, STARTUP_BACKGROUND_DELAY_MS)
   }
 

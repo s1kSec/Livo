@@ -131,7 +131,16 @@ function preloadSettingsTab(tabId: SettingsTabId) {
 }
 
 export function SettingsDialog() {
-  const { isOpen, setOpen, activeTab, setActiveTab } = useSettingsStore()
+  const {
+    isOpen,
+    setOpen,
+    activeTab: storedActiveTab,
+    setActiveTab,
+  } = useSettingsStore()
+  const activeTab =
+    storedActiveTab === 'user' || storedActiveTab === 'wechat-rss'
+      ? 'general'
+      : storedActiveTab
   useOverlayHotkeyScope('settings', isOpen)
   const { zIndex, isTop } = useOverlayStackItem('settings', isOpen)
   const { t } = useTranslation()
@@ -276,18 +285,20 @@ export function SettingsDialog() {
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-semibold">{t('settings.title')}</h2>
           </div>
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              onMouseEnter={() => preloadSettingsTab(tab.id)}
-              onFocus={() => preloadSettingsTab(tab.id)}
-              className={`sidebar-item w-full ${activeTab === tab.id ? 'sidebar-item-active' : ''}`}
-            >
-              <tab.icon size={16} />
-              {tab.label}
-            </button>
-          ))}
+          {tabs
+            .filter((tab) => tab.id !== 'user' && tab.id !== 'wechat-rss')
+            .map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                onMouseEnter={() => preloadSettingsTab(tab.id)}
+                onFocus={() => preloadSettingsTab(tab.id)}
+                className={`sidebar-item w-full ${activeTab === tab.id ? 'sidebar-item-active' : ''}`}
+              >
+                <tab.icon size={16} />
+                {tab.label}
+              </button>
+            ))}
         </div>
 
         {/* Right content */}
@@ -305,7 +316,11 @@ export function SettingsDialog() {
             }}
           >
             <h3 className="font-medium">
-              {tabs.find((t) => t.id === activeTab)?.label}
+              {
+                tabs
+                  .filter((tab) => tab.id !== 'user' && tab.id !== 'wechat-rss')
+                  .find((tab) => tab.id === activeTab)?.label
+              }
             </h3>
             <button
               onClick={() => setOpen(false)}

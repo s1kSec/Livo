@@ -1,4 +1,5 @@
 import { getBackendBaseUrl } from '../backend/backend-config'
+import { IS_LOCAL_BUILD } from '../../../shared/local-mode'
 
 const WECHAT_MP_UPSTREAM_FEED_PATH = /^\/feed\/(MP_WXS_[^/?#]+)\.xml$/i
 const WECHAT_MP_BACKEND_FEED_PATH =
@@ -13,6 +14,7 @@ function decodeFeedId(value: string): string {
 }
 
 export function rewriteWechatMpFeedUrlToBackendProxy(url: string): string {
+  if (IS_LOCAL_BUILD) return url
   const trimmed = url.trim()
   if (!trimmed) return url
 
@@ -30,15 +32,21 @@ export function rewriteWechatMpFeedUrlToBackendProxy(url: string): string {
 }
 
 export function isWechatMpBackendFeedUrl(url: string): boolean {
+  if (IS_LOCAL_BUILD) return false
   try {
     const parsed = new URL(url.trim())
-    return WECHAT_MP_BACKEND_FEED_PATH.test(parsed.pathname)
+    const backendOrigin = new URL(getBackendBaseUrl()).origin
+    return (
+      parsed.origin === backendOrigin &&
+      WECHAT_MP_BACKEND_FEED_PATH.test(parsed.pathname)
+    )
   } catch {
     return false
   }
 }
 
 export function toWechatMpFreshBackendUrl(url: string): string | null {
+  if (IS_LOCAL_BUILD) return null
   try {
     const parsed = new URL(url.trim())
     const match = parsed.pathname.match(WECHAT_MP_BACKEND_FEED_PATH)

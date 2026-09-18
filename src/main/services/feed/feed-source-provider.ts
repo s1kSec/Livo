@@ -26,6 +26,7 @@ import {
   type FeedCacheEntry,
   type FeedCacheHit,
 } from './feed-cache-client'
+import { IS_LOCAL_BUILD } from '../../../shared/local-mode'
 
 type ParsedFeed = RssParser.Output<Record<string, any>>
 
@@ -74,14 +75,32 @@ function getFeedKey(feed: Feed, normalizedUrl: string): string {
 }
 
 function getNormalizedFeedUrl(feed: Feed): string {
+  const assertLocalPolicy = (url: string): string => {
+    if (!IS_LOCAL_BUILD) return url
+    try {
+      if (new URL(url).hostname.endsWith('livospace.cn')) {
+        throw new Error('Livo Local does not fetch upstream livospace.cn URLs.')
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('does not fetch')) {
+        throw error
+      }
+    }
+    return url
+  }
+
   if (feed.upstreamUrl && /^https?:\/\//i.test(feed.upstreamUrl)) {
-    return rewriteWechatMpFeedUrlToBackendProxy(feed.upstreamUrl)
+    return assertLocalPolicy(
+      rewriteWechatMpFeedUrlToBackendProxy(feed.upstreamUrl),
+    )
   }
   const rsshubInstance =
     settingsProvider.get().general.rsshubInstance?.trim() ||
     DEFAULT_RSSHUB_INSTANCE
-  return rewriteWechatMpFeedUrlToBackendProxy(
-    normalizeFeedUrl(feed.url, rsshubInstance),
+  return assertLocalPolicy(
+    rewriteWechatMpFeedUrlToBackendProxy(
+      normalizeFeedUrl(feed.url, rsshubInstance),
+    ),
   )
 }
 

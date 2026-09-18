@@ -8,8 +8,8 @@ const buildTime = getBuildTimestamp()
 const isMacRelease = process.env.LIVO_MAC_RELEASE === 'true'
 
 export default {
-  appId: 'com.livospace.cn',
-  productName: 'Livo',
+  appId: 'io.livolocal.app',
+  productName: 'Livo Local',
   copyright: 'Copyright © 2026 Livo',
   artifactName: '${productName}-${version}-${os}-${arch}.${ext}',
   asar: true,
@@ -43,22 +43,14 @@ export default {
   ],
   protocols: [
     {
-      name: 'Livo',
-      schemes: ['livo'],
-    },
-  ],
-  publish: [
-    {
-      provider: 'github',
-      owner: 'kaieye',
-      repo: 'Livo',
-      releaseType: 'draft',
+      name: 'Livo Local',
+      schemes: ['livo-local'],
     },
   ],
   win: {
     target: ['dir'],
     icon: 'resources/yuanjiao-Livo.ico',
-    executableName: 'Livo',
+    executableName: 'LivoLocal',
   },
   mac: {
     target: ['dmg', 'zip'],

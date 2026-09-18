@@ -56,7 +56,6 @@ import { useQuickSearchStore } from '../../store/quick-search-store'
 import { VIEW_TYPE_SLUGS } from '../../router/route-paths'
 import { getFeedRefreshIssueLabel } from '../../lib/feed-refresh-issue'
 import { FeedRefreshIssueBadge } from './FeedRefreshIssueBadge'
-import { NotificationBell } from '../notifications/NotificationBell'
 import { getSafeImageSrc } from '../../lib/safe-image-source'
 import {
   markStartupComponentMounted,
@@ -2065,10 +2064,6 @@ export function Sidebar({ width }: { width?: number }) {
             >
               <Settings size={18} />
             </button>
-            <NotificationBell
-              iconSize={18}
-              className="sidebar-item text-text-secondary dark:text-text-dark-secondary flex-1 justify-center"
-            />
           </div>
         </div>
       </aside>

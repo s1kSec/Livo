@@ -89,7 +89,7 @@ export function parseDeepLink(rawUrl: string): DeepLinkAction | null {
     return null
   }
 
-  if (parsed.protocol.toLowerCase() !== 'livo:') return null
+  if (parsed.protocol.toLowerCase() !== `${LOCAL_PROTOCOL}:`) return null
 
   const segments = [
     parsed.hostname,
@@ -137,3 +137,4 @@ export function parseDeepLink(rawUrl: string): DeepLinkAction | null {
       return null
   }
 }
+import { LOCAL_PROTOCOL } from './local-mode'

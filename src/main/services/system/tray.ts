@@ -4,20 +4,13 @@ import { logInfo, logWarn } from './logger'
 
 function createTrayImage() {
   const iconPath = getTrayIconPath()
-
   logInfo('[tray] loading icon from', iconPath)
-
   const image = nativeImage.createFromPath(iconPath)
   if (image.isEmpty()) {
     logWarn('[tray] image is empty, path may be wrong:', iconPath)
     return nativeImage.createEmpty()
   }
-
-  logInfo('[tray] loaded image size:', image.getSize())
-
-  const resized = image.resize({ width: 32, height: 32 })
-  logInfo('[tray] resized to:', resized.getSize())
-  return resized
+  return image.resize({ width: 32, height: 32 })
 }
 
 export class AppTray {
@@ -29,7 +22,6 @@ export class AppTray {
       hideWindow: () => void
       refreshAll: () => void
       openSettings: () => void
-      checkForUpdates: () => void
       quit: () => void
       isWindowVisible: () => boolean
     },
@@ -39,13 +31,10 @@ export class AppTray {
     if (this.tray) return
     try {
       this.tray = new Tray(createTrayImage())
-      this.tray.setToolTip('Livo')
+      this.tray.setToolTip('Livo Local')
       this.tray.on('click', () => {
-        if (this.actions.isWindowVisible()) {
-          this.actions.hideWindow()
-        } else {
-          this.actions.showWindow()
-        }
+        if (this.actions.isWindowVisible()) this.actions.hideWindow()
+        else this.actions.showWindow()
       })
       this.refreshMenu()
     } catch (error) {
@@ -55,42 +44,30 @@ export class AppTray {
 
   refreshMenu(): void {
     if (!this.tray) return
-    const menu = Menu.buildFromTemplate([
-      {
-        label: this.actions.isWindowVisible() ? '隐藏 Livo' : '显示 Livo',
-        click: () => {
-          if (this.actions.isWindowVisible()) {
-            this.actions.hideWindow()
-          } else {
-            this.actions.showWindow()
-          }
-          this.refreshMenu()
+    const visible = this.actions.isWindowVisible()
+    this.tray.setContextMenu(
+      Menu.buildFromTemplate([
+        {
+          label: visible ? 'Hide Livo Local' : 'Show Livo Local',
+          click: () => {
+            if (this.actions.isWindowVisible()) this.actions.hideWindow()
+            else this.actions.showWindow()
+            this.refreshMenu()
+          },
         },
-      },
-      {
-        label: '刷新全部订阅',
-        click: () => this.actions.refreshAll(),
-      },
-      {
-        label: '设置',
-        click: () => this.actions.openSettings(),
-      },
-      {
-        label: '检查更新',
-        click: () => this.actions.checkForUpdates(),
-      },
-      { type: 'separator' },
-      {
-        label: '退出',
-        click: () => this.actions.quit(),
-      },
-    ])
-    this.tray.setContextMenu(menu)
+        {
+          label: 'Refresh subscriptions',
+          click: () => this.actions.refreshAll(),
+        },
+        { label: 'Settings', click: () => this.actions.openSettings() },
+        { type: 'separator' },
+        { label: 'Quit', click: () => this.actions.quit() },
+      ]),
+    )
   }
 
   destroy(): void {
-    if (!this.tray) return
-    this.tray.destroy()
+    this.tray?.destroy()
     this.tray = null
   }
 }

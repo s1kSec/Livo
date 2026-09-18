@@ -139,8 +139,8 @@ describe('settings normalization', () => {
     ).toEqual(DEFAULT_SETTINGS.agent.webSearchProviders)
   })
 
-  it('defaults server knowledge on and repairs invalid values', () => {
-    expect(normalizeSettings().agent.enableServerKnowledge).toBe(true)
+  it('defaults server knowledge off and repairs invalid values', () => {
+    expect(normalizeSettings().agent.enableServerKnowledge).toBe(false)
     expect(
       normalizeSettings({
         agent: { enableServerKnowledge: false } as any,

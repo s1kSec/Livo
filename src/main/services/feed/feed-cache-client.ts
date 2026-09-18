@@ -1,6 +1,7 @@
 import { session } from 'electron'
 import { getBackendBaseUrl } from '../backend/backend-config'
 import { sessionStore } from '../auth/session-store'
+import { IS_LOCAL_BUILD } from '../../../shared/local-mode'
 
 export interface FeedCacheEntry {
   guid: string
@@ -33,6 +34,7 @@ export interface FeedCacheQueryOptions {
  * 后端会再校验一次；这里只是客户端的提前过滤，避免无谓请求。
  */
 export function shouldUseServerFeedCache(): boolean {
+  if (IS_LOCAL_BUILD) return false
   const user = sessionStore.getCurrentUser()
   if (!user) return false
   if (user.role === 'admin') return true

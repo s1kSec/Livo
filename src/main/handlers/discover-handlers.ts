@@ -49,6 +49,7 @@ import {
   searchWechatMp,
 } from '../services/discovery/wechat-mp-client'
 import { toHandlerError } from '../ipc/handler-error'
+import { IS_LOCAL_BUILD } from '../../shared/local-mode'
 
 /** Return the configured RSSHub instance URL (no trailing slash) */
 function getRSSHubInstance(): string {
@@ -105,11 +106,17 @@ export function registerDiscoverHandlers(): void {
   registerChannel(
     IPC.DISCOVER_SEARCH_WECHAT_MP,
     async (_event, query: string, options) => {
+      if (IS_LOCAL_BUILD) return []
       return searchWechatMp(query, options)
     },
   )
 
   registerChannel(IPC.DISCOVER_ENSURE_WECHAT_MP_FEED, async (_event, input) => {
+    if (IS_LOCAL_BUILD) {
+      return toHandlerError(
+        new Error('WeChat RSS is disabled in the local build.'),
+      )
+    }
     try {
       return await ensureWechatMpFeed(input)
     } catch (error) {

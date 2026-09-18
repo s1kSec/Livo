@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Github } from 'lucide-react'
-import { openExternalUrlSafe } from '../../services/external-url'
 import { useUpdateStore } from '../../store/update-store'
 
 const ICON_CACHE_KEY = 'livo-about-icon'
@@ -105,7 +103,7 @@ export function AboutSettings() {
         {iconUrl ? (
           <img
             src={iconUrl}
-            alt="Livo"
+            alt="Livo Local"
             className="mx-auto mb-4 h-20 w-20 rounded-3xl"
           />
         ) : (
@@ -125,7 +123,7 @@ export function AboutSettings() {
             </svg>
           </div>
         )}
-        <h2 className="text-xl font-bold">Livo</h2>
+        <h2 className="text-xl font-bold">Livo Local</h2>
       </div>
 
       <div className="bg-surface-secondary dark:bg-surface-dark-tertiary space-y-3 rounded-xl border p-4">
@@ -158,13 +156,6 @@ export function AboutSettings() {
           {updateInfo?.hasUpdate ? (
             <button
               onClick={() => {
-                if (
-                  updateInfo.releaseUrl &&
-                  (updateInfo.canInstall === false || updateStatus === 'error')
-                ) {
-                  void openExternalUrlSafe(updateInfo.releaseUrl)
-                  return
-                }
                 void installUpdate()
               }}
               disabled={
@@ -248,23 +239,6 @@ export function AboutSettings() {
             <p className="text-text-tertiary mt-0.5 text-xs">{feature.desc}</p>
           </div>
         ))}
-      </div>
-
-      {/* Links */}
-      <div className="flex justify-center gap-4 pt-2">
-        <a
-          href="https://github.com/kaieye/Livo"
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(event) => {
-            event.preventDefault()
-            void openExternalUrlSafe('https://github.com/kaieye/Livo')
-          }}
-          className="text-text-secondary hover:text-accent flex items-center gap-1.5 text-sm transition-colors"
-        >
-          <Github size={16} />
-          GitHub
-        </a>
       </div>
     </div>
   )

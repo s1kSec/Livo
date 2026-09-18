@@ -1,64 +1,9 @@
-import updaterPkg from 'electron-updater'
 import { app, type BrowserWindow } from 'electron'
 import type {
   AppUpdateInfo,
   AppUpdateInstallResult,
   AppUpdateState,
 } from '../../shared/types'
-import { __internal } from './system/update-check-internal'
-import { checkForAppUpdates as checkWindowsUpdates } from './system/update-check'
-import { installAppUpdate as installWindowsUpdate } from './system/update-install'
-import { canInstallMacUpdateInPlace } from './system/mac-update-capability'
-
-const { autoUpdater } = updaterPkg
-const RELEASES_URL = 'https://github.com/kaieye/Livo/releases/latest'
-const MAC_UPDATE_CHECK_MAX_ATTEMPTS = 3
-const MAC_INSTALL_HANDOFF_TIMEOUT_MS = 30_000
-const MAC_MANUAL_INSTALL_ERROR =
-  '当前 macOS 安装包不支持应用内覆盖安装，请下载 DMG 手动更新'
-const MAC_INSTALL_HANDOFF_ERROR =
-  '更新已下载，但 macOS 未能启动安装程序，请下载 DMG 手动更新'
-
-const TRANSIENT_UPDATE_ERROR_CODES = [
-  'ERR_CONNECTION_CLOSED',
-  'ERR_CONNECTION_RESET',
-  'ERR_NETWORK_CHANGED',
-  'ERR_PROXY_CONNECTION_FAILED',
-  'ERR_TIMED_OUT',
-  'ERR_TUNNEL_CONNECTION_FAILED',
-  'ECONNRESET',
-  'ETIMEDOUT',
-] as const
-
-function isTransientUpdateCheckError(error: unknown): boolean {
-  const code =
-    error && typeof error === 'object' && 'code' in error
-      ? String((error as { code?: unknown }).code || '')
-      : ''
-  const message = error instanceof Error ? error.message : String(error)
-  return TRANSIENT_UPDATE_ERROR_CODES.some(
-    (candidate) => code.includes(candidate) || message.includes(candidate),
-  )
-}
-
-async function checkMacUpdatesWithRetry() {
-  for (
-    let attempt = 1;
-    attempt <= MAC_UPDATE_CHECK_MAX_ATTEMPTS;
-    attempt += 1
-  ) {
-    try {
-      return await autoUpdater.checkForUpdates()
-    } catch (error) {
-      const shouldRetry =
-        attempt < MAC_UPDATE_CHECK_MAX_ATTEMPTS &&
-        isTransientUpdateCheckError(error)
-      if (!shouldRetry) throw error
-    }
-  }
-
-  return null
-}
 
 function platformName(): AppUpdateInfo['platform'] {
   if (process.platform === 'win32' || process.platform === 'darwin') {
@@ -67,221 +12,47 @@ function platformName(): AppUpdateInfo['platform'] {
   return 'other'
 }
 
-function releaseNotesText(notes: unknown): string | undefined {
-  if (typeof notes === 'string') return notes
-  if (!Array.isArray(notes)) return undefined
-
-  const text = notes
-    .map((note) => {
-      if (!note || typeof note !== 'object') return ''
-      const value = (note as { note?: unknown }).note
-      return typeof value === 'string' ? value : ''
-    })
-    .filter(Boolean)
-    .join('\n\n')
-  return text || undefined
-}
-
-function updateErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error)
-  if (
-    message.includes('SQRLCodeSignatureErrorDomain') ||
-    (message.includes('Code signature at URL') &&
-      message.includes('did not pass validation'))
-  ) {
-    return MAC_MANUAL_INSTALL_ERROR
-  }
-  return message
-}
-
+/**
+ * Livo Local intentionally has no bundled update channel. This service keeps
+ * the existing application IPC contract stable while making every update
+ * action a local no-op.
+ */
 export class UpdaterService {
   private window: BrowserWindow | null = null
-  private installHandoffTimer: ReturnType<typeof setTimeout> | null = null
 
-  constructor(isDev: boolean) {
-    if (isDev) {
-      autoUpdater.updateConfigPath = null
-      autoUpdater.forceDevUpdateConfig = false
-    }
-
-    autoUpdater.autoDownload = false
-    autoUpdater.autoInstallOnAppQuit = true
-
-    autoUpdater.on('update-available', (info) => {
-      this.sendToWindow('updater:available', info)
-    })
-
-    autoUpdater.on('download-progress', (progress) => {
-      this.sendToWindow('updater:progress', progress)
-      this.sendUpdateState({
-        status: 'downloading',
-        percent: progress.percent,
-        transferred: progress.transferred,
-        total: progress.total,
-        bytesPerSecond: progress.bytesPerSecond,
-      })
-    })
-
-    autoUpdater.on('update-downloaded', (info) => {
-      this.sendToWindow('updater:downloaded', info)
-      this.sendUpdateState({ status: 'downloaded', percent: 100 })
-    })
-
-    autoUpdater.on('error', (error) => {
-      this.clearInstallHandoffTimer()
-      const message = updateErrorMessage(error)
-      this.sendToWindow('updater:error', message)
-      this.sendUpdateState({ status: 'error', error: message })
-    })
-  }
-
-  private clearInstallHandoffTimer(): void {
-    if (!this.installHandoffTimer) return
-    clearTimeout(this.installHandoffTimer)
-    this.installHandoffTimer = null
-  }
-
-  private startInstallHandoffTimer(): void {
-    this.clearInstallHandoffTimer()
-    this.installHandoffTimer = setTimeout(() => {
-      this.installHandoffTimer = null
-      this.sendUpdateState({
-        status: 'error',
-        error: MAC_INSTALL_HANDOFF_ERROR,
-      })
-    }, MAC_INSTALL_HANDOFF_TIMEOUT_MS)
-    this.installHandoffTimer.unref?.()
-  }
-
-  // autoUpdater 的事件可能在窗口销毁后（如退出过程中）触发，
-  // 直接 send 会抛 "Object has been destroyed"。
-  private sendToWindow(channel: string, ...args: unknown[]): void {
-    if (!this.window || this.window.isDestroyed()) return
-    this.window.webContents.send(channel, ...args)
-  }
+  constructor(_isDev: boolean) {}
 
   private sendUpdateState(state: AppUpdateState): void {
-    this.sendToWindow('app:update-state', state)
+    if (!this.window || this.window.isDestroyed()) return
+    this.window.webContents.send('app:update-state', state)
   }
 
   setWindow(window: BrowserWindow): void {
     this.window = window
   }
 
-  async checkForAppUpdates(force = false): Promise<AppUpdateInfo> {
-    this.sendUpdateState({ status: 'checking' })
-    const currentVersion = app.getVersion()
-    const platform = platformName()
-
-    if (platform !== 'darwin' || !app.isPackaged) {
-      const info = await checkWindowsUpdates(force)
-      const result: AppUpdateInfo = {
-        ...info,
-        canInstall:
-          platform === 'win32' &&
-          app.isPackaged &&
-          info.hasUpdate &&
-          !!info.installerDownloadUrl,
-        platform,
-      }
-      this.sendUpdateState({
-        status: result.error
-          ? 'error'
-          : result.hasUpdate
-            ? 'available'
-            : 'idle',
-        info: result,
-        error: result.error,
-      })
-      return result
+  async checkForAppUpdates(_force = false): Promise<AppUpdateInfo> {
+    const info: AppUpdateInfo = {
+      hasUpdate: false,
+      canInstall: false,
+      platform: platformName(),
+      currentVersion: app.getVersion(),
     }
-
-    try {
-      const result = await checkMacUpdatesWithRetry()
-      const updateInfo = result?.updateInfo
-      const latestVersion = updateInfo?.version
-      const hasUpdate =
-        !!latestVersion &&
-        __internal.compareVersions(latestVersion, currentVersion) > 0
-      const info: AppUpdateInfo = {
-        hasUpdate,
-        canInstall: hasUpdate && canInstallMacUpdateInPlace(),
-        platform,
-        currentVersion,
-        latestVersion,
-        releaseUrl: RELEASES_URL,
-        publishedAt: updateInfo?.releaseDate,
-        notes: releaseNotesText(updateInfo?.releaseNotes),
-      }
-      this.sendUpdateState({
-        status: hasUpdate ? 'available' : 'idle',
-        info,
-      })
-      return info
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      const info: AppUpdateInfo = {
-        hasUpdate: false,
-        canInstall: false,
-        platform,
-        currentVersion,
-        error: message,
-      }
-      this.sendUpdateState({ status: 'error', info, error: message })
-      return info
-    }
+    this.sendUpdateState({ status: 'idle', info })
+    return info
   }
 
   async installAppUpdate(): Promise<AppUpdateInstallResult> {
-    if (process.platform === 'win32') {
-      return installWindowsUpdate((state) => this.sendUpdateState(state))
-    }
-    if (process.platform !== 'darwin' || !app.isPackaged) {
-      return {
-        success: false,
-        error: app.isPackaged
-          ? '当前平台暂不支持应用内更新'
-          : '开发模式无法执行应用内更新，请打包后验证',
-      }
-    }
-
-    try {
-      const info = await this.checkForAppUpdates()
-      if (!info.hasUpdate) {
-        return { success: false, error: '当前没有可安装的新版本' }
-      }
-      if (!info.canInstall) {
-        return { success: false, error: MAC_MANUAL_INSTALL_ERROR }
-      }
-
-      this.sendUpdateState({ status: 'downloading', percent: 0 })
-      await autoUpdater.downloadUpdate()
-      this.sendUpdateState({ status: 'downloaded', percent: 100 })
-      this.sendUpdateState({ status: 'installing' })
-      this.startInstallHandoffTimer()
-      autoUpdater.quitAndInstall(false, true)
-      return { success: true }
-    } catch (error) {
-      this.clearInstallHandoffTimer()
-      const message = updateErrorMessage(error)
-      this.sendUpdateState({ status: 'error', error: message })
-      return { success: false, error: message }
-    }
+    return { success: false, error: 'Updates are disabled in the local build.' }
   }
 
-  async checkForUpdates() {
-    try {
-      return await checkMacUpdatesWithRetry()
-    } catch {
-      return null
-    }
+  async checkForUpdates(): Promise<{ updateInfo?: unknown } | null> {
+    return null
   }
 
-  downloadUpdate() {
-    return autoUpdater.downloadUpdate()
+  async downloadUpdate(): Promise<string[]> {
+    return []
   }
 
-  quitAndInstall(): void {
-    autoUpdater.quitAndInstall(false, true)
-  }
+  quitAndInstall(): void {}
 }

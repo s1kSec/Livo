@@ -11,7 +11,7 @@ export const SUPABASE_CONFIG = {
   // OAuth 回调配置
   auth: {
     // Desktop 深链接回调（需要在 Supabase Redirect URLs 中配置）
-    redirectTo: 'livo://auth/callback',
+    redirectTo: 'livo-local://auth/callback',
 
     // Google OAuth 配置
     google: {
