@@ -1,21 +1,30 @@
 @echo off
-setlocal
+setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
 
 set "CHECK_ONLY=0"
 if /I "%~1"=="--check" set "CHECK_ONLY=1"
 
-where node >nul 2>&1
-if errorlevel 1 (
+set "NODE_EXE="
+for /f "delims=" %%I in ('where node.exe 2^>nul') do if not defined NODE_EXE set "NODE_EXE=%%I"
+if not defined NODE_EXE (
   echo [Livo Local] Node.js was not found. Install Node.js 22 or newer first.
   goto :failed
 )
 
+"!NODE_EXE!" --version >nul 2>&1
+if errorlevel 1 (
+  echo [Livo Local] Node.js was found but could not be executed: !NODE_EXE!
+  goto :failed
+)
+
 if not exist "node_modules\electron-vite\bin\electron-vite.js" (
-  where pnpm >nul 2>&1
-  if errorlevel 1 (
-    where corepack >nul 2>&1
-    if errorlevel 1 (
+  set "PNPM_CMD="
+  set "COREPACK_CMD="
+  for /f "delims=" %%I in ('where pnpm.cmd 2^>nul') do if not defined PNPM_CMD set "PNPM_CMD=%%I"
+  if not defined PNPM_CMD (
+    for /f "delims=" %%I in ('where corepack.cmd 2^>nul') do if not defined COREPACK_CMD set "COREPACK_CMD=%%I"
+    if not defined COREPACK_CMD (
       echo [Livo Local] pnpm or corepack is required to install dependencies.
       goto :failed
     )
@@ -27,11 +36,10 @@ if not exist "node_modules\electron-vite\bin\electron-vite.js" (
   )
 
   echo [Livo Local] First launch: installing project dependencies...
-  where pnpm >nul 2>&1
-  if errorlevel 1 (
-    call corepack pnpm install
+  if defined PNPM_CMD (
+    call "!PNPM_CMD!" install
   ) else (
-    call pnpm install
+    call "!COREPACK_CMD!" pnpm install
   )
   if errorlevel 1 (
     echo [Livo Local] Dependency installation failed.
@@ -45,7 +53,7 @@ if "%CHECK_ONLY%"=="1" (
 )
 
 echo [Livo Local] Starting the desktop application...
-node scripts\run-electron-vite.mjs dev
+"!NODE_EXE!" scripts\run-electron-vite.mjs dev
 if errorlevel 1 (
   echo [Livo Local] Startup failed. Review the error output above.
   goto :failed
