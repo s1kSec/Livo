@@ -36,7 +36,7 @@ import { useFeedStore } from '../store/feed-store'
 import {
   useGeneralSettingsShallowSelector,
   useTranslationSettingKey,
-  useAISettingKey,
+  useAISettingsShallowSelector,
   useSettingsActions,
   useSettingSection,
 } from '../store/settings-store'
@@ -96,7 +96,11 @@ export default function ArticleDetailPage() {
     language: s.language,
   }))
   const translationTargetLanguage = useTranslationSettingKey('targetLanguage')
-  const aiApiKey = useAISettingKey('apiKey')
+  const translationProvider = useTranslationSettingKey('provider')
+  const aiApiKey = useAISettingsShallowSelector(
+    (ai) => ai.apiKeys?.[ai.provider] ?? ai.apiKey,
+  )
+  const translationDisabled = translationProvider === 'ai' && !aiApiKey
   const { updateSettingsSection } = useSettingsActions()
 
   // Social entry detection — look up the parent feed's viewType
@@ -203,13 +207,22 @@ export default function ArticleDetailPage() {
   // Auto-trigger on entry load when enabled in settings (Harmony parity).
   const autoTriggeredEntryRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!entryId || !activeEntry?.content || !aiApiKey) return
+    if (!entryId || !activeEntry?.content) return
     if (autoTriggeredEntryRef.current === entryId) return
+    const shouldSummarize =
+      summarySettings.enabled &&
+      summarySettings.autoTrigger &&
+      Boolean(aiApiKey)
+    const shouldTranslate =
+      translationSettings.enabled &&
+      translationSettings.autoTranslate &&
+      !translationDisabled
+    if (!shouldSummarize && !shouldTranslate) return
     autoTriggeredEntryRef.current = entryId
-    if (summarySettings.enabled && summarySettings.autoTrigger) {
+    if (shouldSummarize) {
       handleSummarize()
     }
-    if (translationSettings.enabled && translationSettings.autoTranslate) {
+    if (shouldTranslate) {
       handleTranslate()
     }
   }, [
@@ -220,6 +233,7 @@ export default function ArticleDetailPage() {
     summarySettings.autoTrigger,
     translationSettings.enabled,
     translationSettings.autoTranslate,
+    translationDisabled,
     handleSummarize,
     handleTranslate,
   ])
@@ -421,7 +435,8 @@ export default function ArticleDetailPage() {
                 targetLanguage: lang,
               })
             }
-            disabled={!aiApiKey}
+            summaryDisabled={!aiApiKey}
+            translationDisabled={translationDisabled}
           />
         )}
       </header>

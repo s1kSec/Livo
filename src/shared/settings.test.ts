@@ -183,6 +183,27 @@ describe('settings normalization', () => {
     expect(merged.ai.model).toBeTruthy()
   })
 
+  it('defaults and normalizes the translation provider', () => {
+    expect(normalizeSettings().translation.provider).toBe('ai')
+    expect(
+      normalizeSettings({
+        translation: { provider: 'unsupported' },
+      } as any).translation.provider,
+    ).toBe('ai')
+  })
+
+  it('accepts supported translation providers and rejects unknown ones', () => {
+    expect(
+      sanitizeSettingsPatch({ translation: { provider: 'google' } }),
+    ).toEqual({ translation: { provider: 'google' } })
+    expect(
+      sanitizeSettingsPatch({ translation: { provider: 'microsoft' } }),
+    ).toEqual({ translation: { provider: 'microsoft' } })
+    expect(() =>
+      sanitizeSettingsPatch({ translation: { provider: 'unknown' } }),
+    ).toThrow(SettingsPatchValidationError)
+  })
+
   it('keeps per-provider AI connection history fields', () => {
     const normalized = mergeSettings(normalizeSettings(), {
       ai: {

@@ -271,6 +271,7 @@ export const SocialMediaItem = memo(function SocialMediaItem({
   // AI translation & summary state - use AI hook
   const language = useGeneralSettingKey('language')
   const targetLanguage = useTranslationSettingKey('targetLanguage')
+  const translationProvider = useTranslationSettingKey('provider')
   const {
     tweetTranslatedParagraphs,
     isTranslatingTweet,
@@ -282,7 +283,14 @@ export const SocialMediaItem = memo(function SocialMediaItem({
     showTweetSummary,
     handleSummarizeTweet,
     tweetTextContent,
-  } = useEntryAI(entry.id, entry, sanitizedContent, language, targetLanguage)
+  } = useEntryAI(
+    entry.id,
+    entry,
+    sanitizedContent,
+    language,
+    targetLanguage,
+    translationProvider,
+  )
 
   // Hover action bar state
   const [showActionBar, setShowActionBar] = useState(false)

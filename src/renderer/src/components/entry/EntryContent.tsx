@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useEntryStore } from '../../store/entry-store'
 import { useFeedStore } from '../../store/feed-store'
 import {
-  useAISettingKey,
+  useAISettingsShallowSelector,
   useGeneralSettingsShallowSelector,
   useTranslationSettingKey,
   useSettingsActions,
@@ -104,7 +104,11 @@ export function EntryContent({ hideVideo }: { hideVideo?: boolean }) {
     language: settings.language,
   }))
   const translationTargetLanguage = useTranslationSettingKey('targetLanguage')
-  const aiApiKey = useAISettingKey('apiKey')
+  const translationProvider = useTranslationSettingKey('provider')
+  const aiApiKey = useAISettingsShallowSelector(
+    (ai) => ai.apiKeys?.[ai.provider] ?? ai.apiKey,
+  )
+  const translationDisabled = translationProvider === 'ai' && !aiApiKey
   const { setPanelOpen } = useAIChatStore()
   const {
     updateSettingsSection,
@@ -156,7 +160,10 @@ export function EntryContent({ hideVideo }: { hideVideo?: boolean }) {
     retrySegment,
     toggle: toggleTranslation,
     reset: resetTranslation,
-  } = useAITranslation({ entryId: selectedEntry?.id })
+  } = useAITranslation({
+    entryId: selectedEntry?.id,
+    targetLanguage: translationTargetLanguage,
+  })
 
   // Per-entry state — keyed by entry ID, reset on switch
   const [linkCopied, setLinkCopied] = useState(false)
@@ -882,7 +889,8 @@ export function EntryContent({ hideVideo }: { hideVideo?: boolean }) {
             onLanguageChange={(lang) =>
               updateSettingsSection('translation', { targetLanguage: lang })
             }
-            disabled={!aiApiKey}
+            summaryDisabled={!aiApiKey}
+            translationDisabled={translationDisabled}
           />
 
           <ToolbarButton

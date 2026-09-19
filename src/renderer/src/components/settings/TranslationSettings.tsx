@@ -37,9 +37,13 @@ export function TranslationSettings() {
       />
 
       <TranslationFeatureCard
+        provider={translation.provider}
         enabled={translation.enabled}
         autoTranslate={translation.autoTranslate}
         targetLanguage={translation.targetLanguage}
+        onProviderChange={(provider) =>
+          void updateSettingsSection('translation', { provider })
+        }
         onEnabledChange={(enabled) =>
           void updateSettingsSection('translation', { enabled })
         }

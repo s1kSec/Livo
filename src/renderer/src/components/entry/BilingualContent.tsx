@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Languages, Loader2, AlertCircle } from 'lucide-react'
 import type { TranslationErrorMap } from '../../hooks/useAITranslation'
+import { sanitizeHTML } from '../../utils/sanitize'
 
 interface BilingualContentProps {
   paragraphs: string[]
@@ -43,8 +44,10 @@ export function BilingualContent({
     >
       {paragraphs.map((para, i) => {
         const translated = translations[i]
+        const safeParagraph = sanitizeHTML(para)
+        const safeTranslation = translated ? sanitizeHTML(translated) : ''
         const error = errorMap[i]
-        const plainText = para.replace(/<[^>]*>/g, '').trim()
+        const plainText = safeParagraph.replace(/<[^>]*>/g, '').trim()
         if (!plainText) return null
         const canTranslate = plainText.length >= 5
         const isLoading = isTranslating && canTranslate && !translated && !error
@@ -57,11 +60,11 @@ export function BilingualContent({
             {/* Original */}
             <div
               className="entry-content !mb-0"
-              dangerouslySetInnerHTML={{ __html: para }}
+              dangerouslySetInnerHTML={{ __html: safeParagraph }}
             />
 
             {/* Translation */}
-            {translated ? (
+            {safeTranslation ? (
               <div className="relative mb-4 mt-1">
                 <div className="flex items-start gap-2">
                   <Languages
@@ -71,7 +74,7 @@ export function BilingualContent({
                   <div
                     className="entry-content text-accent/80 !mb-0 dark:text-orange-300/80"
                     style={{ fontSize: `${fontSize - 1}px` }}
-                    dangerouslySetInnerHTML={{ __html: translated }}
+                    dangerouslySetInnerHTML={{ __html: safeTranslation }}
                   />
                 </div>
               </div>

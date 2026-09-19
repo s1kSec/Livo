@@ -6,28 +6,14 @@ import type {
   EntryAITranslationSessionStatus,
 } from '../../../shared/types'
 import { getDb } from '../../database'
-import { settingsProvider } from '../system/settings-provider'
-import { runAITranslateTask } from './ai-pipeline'
+import {
+  getTranslationConfigFingerprint,
+  getTranslationProviderModel,
+  runConfiguredTranslationTask,
+} from './translation-provider'
 
 const TRANSLATION_CONCURRENCY = 3
-const CONFIG_CHANGED_ERROR = 'AI 配置已变更，翻译已中止'
-
-function getTranslationConfigFingerprint(): string {
-  const { ai } = settingsProvider.get()
-  return JSON.stringify({
-    provider: ai.provider,
-    apiKey: ai.apiKeys?.[ai.provider] ?? ai.apiKey,
-    baseUrl: ai.baseUrl ?? '',
-    model: ai.model,
-    enableSystemPrompt: ai.enableSystemPrompt ?? false,
-    systemPromptTemplate: ai.systemPromptTemplate ?? '',
-    translationPrompt: ai.translationPrompt ?? '',
-  })
-}
-
-function getTranslationModel(): string | undefined {
-  return settingsProvider.get().ai.model
-}
+const CONFIG_CHANGED_ERROR = '翻译配置已变更，翻译已中止'
 
 function shouldTranslateParagraph(paragraph: string): boolean {
   const plainText = paragraph.replace(/<[^>]*>/g, '').trim()
@@ -67,8 +53,10 @@ function buildSegments(
 function sessionMatchesInput(
   session: EntryAITranslationSession | null,
   input: AITranslateEntrySegmentsInput,
+  fingerprint: string,
 ): session is EntryAITranslationSession {
   if (!session) return false
+  if (session.configFingerprint !== fingerprint) return false
   if (session.targetLanguage !== input.targetLanguage) return false
   if (session.segments.length !== input.paragraphs.length) return false
   return session.segments.every(
@@ -79,11 +67,12 @@ function sessionMatchesInput(
 function createOrResetSession(
   input: AITranslateEntrySegmentsInput,
   fingerprint: string,
+  model: string | undefined,
 ): EntryAITranslationSession {
   const current = getDb().aiTranslationSessions.getLatestSessionByEntryId(
     input.entryId,
   )
-  if (sessionMatchesInput(current, input)) {
+  if (sessionMatchesInput(current, input, fingerprint)) {
     return current
   }
 
@@ -92,7 +81,7 @@ function createOrResetSession(
     targetLanguage: input.targetLanguage,
     status: 'running',
     segments: buildSegments(input.paragraphs, [], {}),
-    model: getTranslationModel(),
+    model,
     configFingerprint: fingerprint,
   })
 }
@@ -118,6 +107,10 @@ function updateSession(
   status: EntryAITranslationSessionStatus,
   results: string[],
   errors: Record<number, string>,
+  config: {
+    fingerprint: string
+    model: string | undefined
+  },
   patch: {
     errorCode?: string
     errorMessage?: string
@@ -131,8 +124,8 @@ function updateSession(
       segments: buildSegments(input.paragraphs, results, errors),
       errorCode: patch.errorCode,
       errorMessage: patch.errorMessage,
-      model: getTranslationModel(),
-      configFingerprint: getTranslationConfigFingerprint(),
+      model: config.model,
+      configFingerprint: config.fingerprint,
       finishedAt: patch.finishedAt,
     }) ?? getDb().aiTranslationSessions.getSessionById(sessionId)
 
@@ -152,7 +145,15 @@ export async function translateEntrySegments(
 
   const normalizedInput = { ...input, entryId, targetLanguage, paragraphs }
   const expectedFingerprint = getTranslationConfigFingerprint()
-  let session = createOrResetSession(normalizedInput, expectedFingerprint)
+  const translationConfig = {
+    fingerprint: expectedFingerprint,
+    model: getTranslationProviderModel(),
+  }
+  let session = createOrResetSession(
+    normalizedInput,
+    translationConfig.fingerprint,
+    translationConfig.model,
+  )
   const previous = sessionToResultState(session)
   const results = [...previous.translatedParagraphs]
   const errors: Record<number, string> = { ...previous.errorMap }
@@ -174,6 +175,7 @@ export async function translateEntrySegments(
     'running',
     results,
     errors,
+    translationConfig,
   )
 
   let cursor = 0
@@ -192,13 +194,19 @@ export async function translateEntrySegments(
           'running',
           results,
           errors,
+          translationConfig,
         )
         results[item.index] = ''
         delete errors[item.index]
-        const result = await runAITranslateTask({
+        const result = await runConfiguredTranslationTask({
           content: item.paragraph,
           targetLanguage,
         })
+        if (getTranslationConfigFingerprint() !== expectedFingerprint) {
+          results[item.index] = ''
+          errors[item.index] = CONFIG_CHANGED_ERROR
+          continue
+        }
         if (result.success) {
           results[item.index] = result.translation
           delete errors[item.index]
@@ -218,7 +226,9 @@ export async function translateEntrySegments(
     ),
   )
 
-  const configChanged = Object.values(errors).includes(CONFIG_CHANGED_ERROR)
+  const configChanged =
+    getTranslationConfigFingerprint() !== expectedFingerprint ||
+    Object.values(errors).includes(CONFIG_CHANGED_ERROR)
   const hasErrors = Object.keys(errors).length > 0
   session = updateSession(
     session.id,
@@ -226,6 +236,7 @@ export async function translateEntrySegments(
     configChanged ? 'config_changed' : hasErrors ? 'failed' : 'succeeded',
     results,
     errors,
+    translationConfig,
     {
       errorCode: configChanged ? 'config_changed' : undefined,
       errorMessage: configChanged

@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import type { TranslationProviderId } from '../../../../../../shared/types'
 import { tweetTranslationCache, tweetSummaryCache } from '../utils/entry-caches'
 import { cleanSocialPlainText, cleanSocialTextHtml } from '../utils/entry-media'
 import { splitHtmlIntoParagraphs } from '../../../../lib/entry-text'
@@ -25,15 +26,29 @@ export function useEntryAI(
   sanitizedContent: string | undefined,
   language: string,
   targetLanguage: string,
+  translationProvider: TranslationProviderId,
 ) {
+  const translationCacheKey = `${entryId}:${targetLanguage}:${translationProvider}`
   // Translation state
   const [tweetTranslatedParagraphs, setTweetTranslatedParagraphs] = useState<
     string[]
-  >(() => tweetTranslationCache.get(entryId) ?? [])
+  >(() => tweetTranslationCache.get(translationCacheKey) ?? [])
   const [isTranslatingTweet, setIsTranslatingTweet] = useState(false)
   const [showTweetTranslation, setShowTweetTranslation] = useState(() =>
-    tweetTranslationCache.has(entryId),
+    tweetTranslationCache.has(translationCacheKey),
   )
+  const translationGenerationRef = useRef(0)
+
+  useEffect(() => {
+    translationGenerationRef.current += 1
+    const cached = tweetTranslationCache.get(translationCacheKey) ?? []
+    setTweetTranslatedParagraphs(cached)
+    setShowTweetTranslation(cached.length > 0)
+    setIsTranslatingTweet(false)
+    return () => {
+      translationGenerationRef.current += 1
+    }
+  }, [translationCacheKey])
 
   // Summary state
   const [tweetSummary, setTweetSummary] = useState<string | null>(
@@ -87,6 +102,9 @@ export function useEntryAI(
       return
     }
     // Do translation paragraph by paragraph
+    const generation = ++translationGenerationRef.current
+    const isCurrentGeneration = () =>
+      translationGenerationRef.current === generation
     setIsTranslatingTweet(true)
     setShowTweetTranslation(true)
     const targetLang = targetLanguage || language || 'zh-CN'
@@ -102,25 +120,29 @@ export function useEntryAI(
           tweetParagraphs[i],
           targetLang,
         )
+        if (!isCurrentGeneration()) return
         if (result.success) {
           results.push(result.translation)
         } else {
           results.push(`<span class="text-red-400 text-xs">❌</span>`)
         }
       } catch {
+        if (!isCurrentGeneration()) return
         results.push(`<span class="text-red-400 text-xs">❌</span>`)
       }
+      if (!isCurrentGeneration()) return
       setTweetTranslatedParagraphs([...results])
     }
-    tweetTranslationCache.set(entryId, results)
+    if (!isCurrentGeneration()) return
+    tweetTranslationCache.set(translationCacheKey, results)
     setIsTranslatingTweet(false)
   }, [
-    entryId,
     language,
     showTweetTranslation,
     targetLanguage,
     tweetParagraphs,
     tweetTranslatedParagraphs.length,
+    translationCacheKey,
   ])
 
   /**

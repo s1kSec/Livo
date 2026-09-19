@@ -1,6 +1,7 @@
 import { Languages, Loader2 } from 'lucide-react'
 import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { sanitizeHTML } from '../../utils/sanitize'
 
 export const SocialContentBody = memo(function SocialContentBody({
   showTranslation,
@@ -26,23 +27,25 @@ export const SocialContentBody = memo(function SocialContentBody({
       <div className="space-y-0" style={{ fontSize: `${fontSize}px` }}>
         {paragraphs.map((para, i) => {
           const translated = translatedParagraphs[i]
+          const safeParagraph = sanitizeHTML(para)
+          const safeTranslation = translated ? sanitizeHTML(translated) : ''
           const isLoading = isTranslating && i === translatedParagraphs.length
-          const plainText = para.replace(/<[^>]*>/g, '').trim()
+          const plainText = safeParagraph.replace(/<[^>]*>/g, '').trim()
           if (!plainText) return null
           return (
             <div
               key={i}
               className="hover:border-accent/30 group border-l-2 border-transparent pl-0 transition-colors hover:pl-3"
             >
-              {para.includes('<') ? (
+              {safeParagraph.includes('<') ? (
                 <div
                   className="entry-content prose dark:prose-invert !mb-0 max-w-none"
-                  dangerouslySetInnerHTML={{ __html: para }}
+                  dangerouslySetInnerHTML={{ __html: safeParagraph }}
                 />
               ) : (
-                <p className="!mb-0 whitespace-pre-line">{para}</p>
+                <p className="!mb-0 whitespace-pre-line">{safeParagraph}</p>
               )}
-              {translated ? (
+              {safeTranslation ? (
                 <div className="relative mb-4 mt-1">
                   <div className="flex items-start gap-2">
                     <Languages
@@ -52,7 +55,7 @@ export const SocialContentBody = memo(function SocialContentBody({
                     <div
                       className="entry-content text-accent/80 !mb-0 dark:text-orange-300/80"
                       style={{ fontSize: `${fontSize - 1}px` }}
-                      dangerouslySetInnerHTML={{ __html: translated }}
+                      dangerouslySetInnerHTML={{ __html: safeTranslation }}
                     />
                   </div>
                 </div>

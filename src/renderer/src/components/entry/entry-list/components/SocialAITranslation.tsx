@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Languages, Loader2 } from 'lucide-react'
+import { sanitizeHTML } from '../../../../utils/sanitize'
 
 interface SocialAITranslationProps {
   isTranslating: boolean
@@ -37,26 +38,28 @@ export const SocialAITranslation = memo(function SocialAITranslation({
         <div className="space-y-0">
           {tweetParagraphs.map((para, i) => {
             const translated = tweetTranslatedParagraphs[i]
+            const safeParagraph = sanitizeHTML(para)
+            const safeTranslation = translated ? sanitizeHTML(translated) : ''
             const isLoading =
               isTranslating && i === tweetTranslatedParagraphs.length
-            const plainText = para.replace(/<[^>]*>/g, '').trim()
+            const plainText = safeParagraph.replace(/<[^>]*>/g, '').trim()
             if (!plainText) return null
             return (
               <div
                 key={i}
                 className="hover:border-accent/30 group border-l-2 border-transparent pl-0 transition-colors hover:pl-2"
               >
-                {para.includes('<') ? (
+                {safeParagraph.includes('<') ? (
                   <div
                     className="!mb-0 text-sm leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: para }}
+                    dangerouslySetInnerHTML={{ __html: safeParagraph }}
                   />
                 ) : (
                   <p className="!mb-0 whitespace-pre-line text-sm leading-relaxed">
-                    {para}
+                    {safeParagraph}
                   </p>
                 )}
-                {translated ? (
+                {safeTranslation ? (
                   <div className="relative mb-2 mt-0.5">
                     <div className="flex items-start gap-1.5">
                       <Languages
@@ -65,7 +68,7 @@ export const SocialAITranslation = memo(function SocialAITranslation({
                       />
                       <div
                         className="text-accent/80 !mb-0 text-sm leading-relaxed dark:text-orange-300/80"
-                        dangerouslySetInnerHTML={{ __html: translated }}
+                        dangerouslySetInnerHTML={{ __html: safeTranslation }}
                       />
                     </div>
                   </div>

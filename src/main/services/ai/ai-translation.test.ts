@@ -3,19 +3,18 @@ import type { EntryAITranslationSession } from '../../../shared/types'
 import { translateEntrySegments } from './ai-translation'
 
 const getDbMock = vi.hoisted(() => vi.fn())
-const settingsProviderGetMock = vi.hoisted(() => vi.fn())
-const runAITranslateTaskMock = vi.hoisted(() => vi.fn())
+const getTranslationConfigFingerprintMock = vi.hoisted(() => vi.fn())
+const getTranslationProviderModelMock = vi.hoisted(() => vi.fn())
+const runConfiguredTranslationTaskMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../../database', () => ({
   getDb: getDbMock,
 }))
 
-vi.mock('../system/settings-provider', () => ({
-  settingsProvider: { get: settingsProviderGetMock },
-}))
-
-vi.mock('./ai-pipeline', () => ({
-  runAITranslateTask: runAITranslateTaskMock,
+vi.mock('./translation-provider', () => ({
+  getTranslationConfigFingerprint: getTranslationConfigFingerprintMock,
+  getTranslationProviderModel: getTranslationProviderModelMock,
+  runConfiguredTranslationTask: runConfiguredTranslationTaskMock,
 }))
 
 function makeSession(
@@ -27,6 +26,7 @@ function makeSession(
     targetLanguage: 'zh-CN',
     status: 'running',
     segments: [],
+    configFingerprint: 'fingerprint-a',
     createdAt: 1,
     updatedAt: 1,
     ...overrides,
@@ -62,20 +62,16 @@ function mockDb(initialSession: EntryAITranslationSession | null = null) {
 describe('translateEntrySegments', () => {
   beforeEach(() => {
     getDbMock.mockReset()
-    settingsProviderGetMock.mockReset()
-    runAITranslateTaskMock.mockReset()
-    settingsProviderGetMock.mockReturnValue({
-      ai: {
-        provider: 'openai',
-        apiKey: 'test-key',
-        model: 'test-model',
-      },
-    })
+    getTranslationConfigFingerprintMock.mockReset()
+    getTranslationProviderModelMock.mockReset()
+    runConfiguredTranslationTaskMock.mockReset()
+    getTranslationConfigFingerprintMock.mockReturnValue('fingerprint-a')
+    getTranslationProviderModelMock.mockReturnValue('test-model')
   })
 
   it('translates runnable paragraphs and persists segment state', async () => {
     const repo = mockDb()
-    runAITranslateTaskMock.mockResolvedValue({
+    runConfiguredTranslationTaskMock.mockResolvedValue({
       success: true,
       translation: '你好世界',
     })
@@ -101,7 +97,7 @@ describe('translateEntrySegments', () => {
       translatedText: '',
       status: 'skipped',
     })
-    expect(runAITranslateTaskMock).toHaveBeenCalledTimes(1)
+    expect(runConfiguredTranslationTaskMock).toHaveBeenCalledTimes(1)
     expect(repo.createSession).toHaveBeenCalledTimes(1)
   })
 
@@ -125,7 +121,7 @@ describe('translateEntrySegments', () => {
         ],
       }),
     )
-    runAITranslateTaskMock.mockResolvedValue({
+    runConfiguredTranslationTaskMock.mockResolvedValue({
       success: true,
       translation: '第二段',
     })
@@ -141,8 +137,8 @@ describe('translateEntrySegments', () => {
     if (!result.success) return
     expect(result.translatedParagraphs).toEqual(['旧翻译', '第二段'])
     expect(result.errorMap).toEqual({})
-    expect(runAITranslateTaskMock).toHaveBeenCalledTimes(1)
-    expect(runAITranslateTaskMock).toHaveBeenCalledWith({
+    expect(runConfiguredTranslationTaskMock).toHaveBeenCalledTimes(1)
+    expect(runConfiguredTranslationTaskMock).toHaveBeenCalledWith({
       content: 'second paragraph',
       targetLanguage: 'zh-CN',
     })
@@ -150,28 +146,9 @@ describe('translateEntrySegments', () => {
 
   it('marks the session config_changed when settings change during translation', async () => {
     mockDb()
-    settingsProviderGetMock
-      .mockReturnValueOnce({
-        ai: {
-          provider: 'openai',
-          apiKey: 'key-a',
-          model: 'test-model',
-        },
-      })
-      .mockReturnValueOnce({
-        ai: {
-          provider: 'openai',
-          apiKey: 'key-a',
-          model: 'test-model',
-        },
-      })
-      .mockReturnValue({
-        ai: {
-          provider: 'openai',
-          apiKey: 'key-b',
-          model: 'test-model',
-        },
-      })
+    getTranslationConfigFingerprintMock
+      .mockReturnValueOnce('fingerprint-a')
+      .mockReturnValue('fingerprint-b')
 
     const result = await translateEntrySegments({
       entryId: 'entry-1',
@@ -184,16 +161,59 @@ describe('translateEntrySegments', () => {
     expect(result.session).toMatchObject({
       status: 'config_changed',
       errorCode: 'config_changed',
-      errorMessage: 'AI 配置已变更，翻译已中止',
+      errorMessage: '翻译配置已变更，翻译已中止',
+      configFingerprint: 'fingerprint-a',
+      model: 'test-model',
     })
     expect(result.errorMap).toEqual({
-      0: 'AI 配置已变更，翻译已中止',
+      0: '翻译配置已变更，翻译已中止',
     })
     expect(result.session.segments[0]).toMatchObject({
       index: 0,
       status: 'failed',
-      errorMessage: 'AI 配置已变更，翻译已中止',
+      errorMessage: '翻译配置已变更，翻译已中止',
     })
-    expect(runAITranslateTaskMock).not.toHaveBeenCalled()
+    expect(runConfiguredTranslationTaskMock).not.toHaveBeenCalled()
+  })
+
+  it('discards a result when the provider changes during the request', async () => {
+    mockDb()
+    let fingerprint = 'fingerprint-a'
+    getTranslationConfigFingerprintMock.mockImplementation(() => fingerprint)
+
+    let resolveTranslation: (value: {
+      success: true
+      translation: string
+    }) => void = () => undefined
+    runConfiguredTranslationTaskMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveTranslation = resolve
+      }),
+    )
+
+    const pending = translateEntrySegments({
+      entryId: 'entry-1',
+      paragraphs: ['hello world'],
+      targetLanguage: 'zh-CN',
+    })
+    await vi.waitFor(() => {
+      expect(runConfiguredTranslationTaskMock).toHaveBeenCalledTimes(1)
+    })
+
+    fingerprint = 'fingerprint-b'
+    resolveTranslation({ success: true, translation: '不应缓存的翻译' })
+    const result = await pending
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.translatedParagraphs).toEqual([''])
+    expect(result.errorMap).toEqual({
+      0: '翻译配置已变更，翻译已中止',
+    })
+    expect(result.session).toMatchObject({
+      status: 'config_changed',
+      configFingerprint: 'fingerprint-a',
+      model: 'test-model',
+    })
   })
 })

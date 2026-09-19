@@ -1833,7 +1833,7 @@ export function SocialOverlay({
 
   // AI Translation & Summary
   const { translatedParagraphs, isTranslating, showTranslation, translate } =
-    useAITranslation({ entryId: entry.id })
+    useAITranslation({ entryId: entry.id, targetLanguage })
   const { summary, error, isLoading: isSummarizing, summarize } = useAISummary()
 
   const handleTranslate = useCallback(() => {

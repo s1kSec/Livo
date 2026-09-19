@@ -19,6 +19,8 @@ export const DEFAULT_AGENT_MAX_TOKENS = 2000
 export const MAX_AGENT_MAX_TOKENS = 32000
 export const WEB_SEARCH_PROVIDERS = ['duckduckgo', 'bing', 'brave'] as const
 export type WebSearchProviderId = (typeof WEB_SEARCH_PROVIDERS)[number]
+export const TRANSLATION_PROVIDERS = ['ai', 'google', 'microsoft'] as const
+export type TranslationProviderId = (typeof TRANSLATION_PROVIDERS)[number]
 
 export interface AppSettings {
   ai: AIConfig
@@ -78,6 +80,7 @@ export interface AppSettings {
   }
   aggregator: AggregatorSettings
   translation: {
+    provider: TranslationProviderId
     enabled: boolean
     targetLanguage: string
     autoTranslate: boolean
@@ -193,6 +196,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     cacheRetentionDays: 7,
   },
   translation: {
+    provider: 'ai',
     enabled: false,
     targetLanguage: 'zh-CN',
     autoTranslate: false,

@@ -10,6 +10,7 @@ import {
   MAX_AGENT_MAX_TOKENS,
   MAX_AGENT_RUN_TIMEOUT_SECONDS,
   MAX_AGENT_TEMPERATURE,
+  TRANSLATION_PROVIDERS,
   WEB_SEARCH_PROVIDERS,
   type AppSettings,
 } from './settings-schema'
@@ -217,6 +218,12 @@ function normalizeAgentFeatureSettings(settings: AppSettings): void {
   }
 }
 
+function normalizeTranslationSettings(settings: AppSettings): void {
+  if (!TRANSLATION_PROVIDERS.includes(settings.translation.provider)) {
+    settings.translation.provider = DEFAULT_SETTINGS.translation.provider
+  }
+}
+
 export function cloneDefaultSettings(): AppSettings {
   return JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as AppSettings
 }
@@ -239,6 +246,7 @@ export function normalizeSettings(input?: Partial<AppSettings>): AppSettings {
   merged.general.feedColumns = normalizeFeedColumns(merged.general.feedColumns)
   normalizeNumericSettings(merged)
   normalizeAgentFeatureSettings(merged)
+  normalizeTranslationSettings(merged)
   normalizeWebSearchProviders(merged)
   syncContentWidth(merged)
 

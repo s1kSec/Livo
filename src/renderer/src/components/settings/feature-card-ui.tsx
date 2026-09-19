@@ -106,3 +106,43 @@ export function FeatureLanguageRow({
     </div>
   )
 }
+
+export function FeatureSelectRow({
+  label,
+  description,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  description?: string
+  value: string
+  options: ReadonlyArray<{ value: string; label: string }>
+  onChange: (next: string) => void
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <div className="min-w-0">
+        <div className="text-text-primary dark:text-text-dark-primary text-sm font-medium">
+          {label}
+        </div>
+        {description && (
+          <p className="text-text-secondary dark:text-text-dark-secondary mt-0.5 text-xs">
+            {description}
+          </p>
+        )}
+      </div>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="bg-surface-primary focus:ring-accent/50 dark:bg-surface-dark-secondary rounded-lg border border-[var(--color-border-secondary)] px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}

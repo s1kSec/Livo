@@ -3,7 +3,11 @@ import {
   FeedViewType,
   type FeedColumnId,
 } from './types/feed'
-import { WEB_SEARCH_PROVIDERS, type AppSettings } from './settings-schema'
+import {
+  TRANSLATION_PROVIDERS,
+  WEB_SEARCH_PROVIDERS,
+  type AppSettings,
+} from './settings-schema'
 
 const SETTINGS_PATCH_MAX_DYNAMIC_RECORD_KEYS = 32
 const SETTINGS_PATCH_DYNAMIC_KEY_MAX_LENGTH = 80
@@ -350,6 +354,7 @@ const aggregatorSettingsPatchSchema: Record<string, FieldSanitizer> = {
 }
 
 const translationSettingsPatchSchema: Record<string, FieldSanitizer> = {
+  provider: sanitizeEnum(TRANSLATION_PROVIDERS),
   enabled: sanitizeBoolean,
   targetLanguage: (value, field) =>
     sanitizeString(value, field, SETTINGS_PATCH_SHORT_STRING_MAX_LENGTH),

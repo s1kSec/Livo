@@ -3,7 +3,11 @@ import type { AppSettings, SettingsTabId } from '../settings-schema'
 import type { FeedWithCount } from './feed'
 import type { ReaderSnapshot } from './entry'
 
-export type { AppSettings, SettingsTabId } from '../settings-schema'
+export type {
+  AppSettings,
+  SettingsTabId,
+  TranslationProviderId,
+} from '../settings-schema'
 export {
   DEFAULT_AGENT_MAX_ROUNDS,
   DEFAULT_AGENT_MAX_TOKENS,
@@ -14,6 +18,7 @@ export {
   MAX_AGENT_MAX_TOKENS,
   MAX_AGENT_RUN_TIMEOUT_SECONDS,
   MAX_AGENT_TEMPERATURE,
+  TRANSLATION_PROVIDERS,
 } from '../settings-schema'
 
 export interface RefreshRunItemResult {

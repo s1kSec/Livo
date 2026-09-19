@@ -11,9 +11,13 @@ import { ConnectionTestService } from '../services/ai/connection-test'
 import {
   generateAIDigest,
   runAISummarizeTask,
-  runAITranslateTask,
   type AIDigestGenerateInput,
 } from '../services/ai/ai-pipeline'
+import {
+  getTranslationConfigFingerprint,
+  normalizeTranslationError,
+  runConfiguredTranslationTask,
+} from '../services/ai/translation-provider'
 import { normalizeDigestPreset } from '../services/ai/ai-digest'
 import { translateEntrySegments } from '../services/ai/ai-translation'
 import {
@@ -119,7 +123,15 @@ export function registerAIHandlers(): void {
   registerChannel(
     IPC.AI_TRANSLATION_SESSION_GET,
     async (_event, entryId: string) => {
-      return getDb().aiTranslationSessions.getLatestSessionByEntryId(entryId)
+      const translationSession =
+        getDb().aiTranslationSessions.getLatestSessionByEntryId(entryId)
+      if (
+        translationSession?.configFingerprint !==
+        getTranslationConfigFingerprint()
+      ) {
+        return null
+      }
+      return translationSession
     },
   )
 
@@ -257,7 +269,7 @@ export function registerAIHandlers(): void {
       const { runId, promise } = runLoggedTask({
         contract: AI_TRANSLATE_TASK,
         payload: { content, targetLanguage, requestId },
-        handler: runAITranslateTask,
+        handler: runConfiguredTranslationTask,
         operationKey: USER_OPERATION_KEYS.AI_TRANSLATE,
         metadata: {
           streaming: Boolean(requestId),
@@ -278,7 +290,7 @@ export function registerAIHandlers(): void {
       } catch (error) {
         return {
           success: false,
-          error: normalizeAIError(error, settingsProvider.get().ai),
+          error: normalizeTranslationError(error),
           runId,
         }
       }

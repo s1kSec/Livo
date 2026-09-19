@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { EntryAITranslationSession } from '../../../shared/types'
+import { useTranslationSettingKey } from '../store/settings-store'
 
 /**
  * Per-paragraph error record. Key is paragraph index, value is error message.
@@ -32,6 +33,7 @@ export interface AITranslationState {
 
 export interface AITranslationOptions {
   entryId?: string
+  targetLanguage?: string
 }
 
 function sessionToState(session: EntryAITranslationSession): {
@@ -62,7 +64,8 @@ function sessionToState(session: EntryAITranslationSession): {
 export function useAITranslation(
   options: AITranslationOptions = {},
 ): AITranslationState {
-  const { entryId } = options
+  const { entryId, targetLanguage } = options
+  const translationProvider = useTranslationSettingKey('provider')
   const [translatedParagraphs, setTranslatedParagraphs] = useState<string[]>([])
   const [isTranslating, setIsTranslating] = useState(false)
   const [showTranslation, setShowTranslation] = useState(false)
@@ -74,6 +77,12 @@ export function useAITranslation(
   } | null>(null)
 
   useEffect(() => {
+    requestIdRef.current++
+    contextRef.current = null
+    setTranslatedParagraphs([])
+    setErrorMap({})
+    setShowTranslation(false)
+    setIsTranslating(false)
     if (!entryId) return
     let canceled = false
 
@@ -81,6 +90,7 @@ export function useAITranslation(
       .getTranslationSession(entryId)
       .then((session) => {
         if (canceled || !session) return
+        if (targetLanguage && session.targetLanguage !== targetLanguage) return
         const next = sessionToState(session)
         setTranslatedParagraphs(next.translatedParagraphs)
         setErrorMap(next.errorMap)
@@ -97,7 +107,7 @@ export function useAITranslation(
     return () => {
       canceled = true
     }
-  }, [entryId])
+  }, [entryId, targetLanguage, translationProvider])
 
   const applySession = useCallback(
     (session: EntryAITranslationSession | undefined) => {

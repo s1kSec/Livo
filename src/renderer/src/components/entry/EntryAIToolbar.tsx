@@ -17,8 +17,10 @@ export interface EntryAIToolbarProps {
   translationTargetLanguage: string
   /** Callback when user changes target language */
   onLanguageChange: (lang: string) => void
-  /** Disable all AI toolbar buttons (e.g. no API key configured) */
-  disabled: boolean
+  /** Disable summarization, for example when no AI key is configured. */
+  summaryDisabled: boolean
+  /** Disable translation when its selected provider is unavailable. */
+  translationDisabled: boolean
   /** Optional additional CSS classes for the toolbar row */
   className?: string
 }
@@ -33,7 +35,7 @@ export interface EntryAIToolbarProps {
  * interaction bar without duplicating toolbar wiring.
  *
  * States handled:
- * - disabled: all buttons greyed out with "Configure AI Key" tooltip
+ * - unavailable: summary and translation are disabled independently
  * - loading: spinner replaces icon
  * - active (translate): accent-highlighted when bilingual view is on
  */
@@ -45,7 +47,8 @@ export function EntryAIToolbar({
   showTranslation,
   translationTargetLanguage,
   onLanguageChange,
-  disabled,
+  summaryDisabled,
+  translationDisabled,
   className = '',
 }: EntryAIToolbarProps) {
   const { t } = useTranslation()
@@ -55,9 +58,11 @@ export function EntryAIToolbar({
       <button
         type="button"
         onClick={onSummarize}
-        disabled={isSummarizing || disabled}
-        title={disabled ? t('entry.configureAIKey') : t('entry.summarize')}
-        className={`text-text-secondary hover:bg-surface-secondary hover:text-text dark:text-text-dark-secondary dark:hover:bg-surface-dark-secondary dark:hover:text-text-dark-primary rounded-lg p-1.5 transition-all duration-150 ${disabled ? 'cursor-default opacity-30' : ''}`}
+        disabled={isSummarizing || summaryDisabled}
+        title={
+          summaryDisabled ? t('entry.configureAIKey') : t('entry.summarize')
+        }
+        className={`text-text-secondary hover:bg-surface-secondary hover:text-text dark:text-text-dark-secondary dark:hover:bg-surface-dark-secondary dark:hover:text-text-dark-primary rounded-lg p-1.5 transition-all duration-150 ${summaryDisabled ? 'cursor-default opacity-30' : ''}`}
       >
         {isSummarizing ? (
           <Loader2 size={16} className="text-accent animate-spin" />
@@ -69,13 +74,15 @@ export function EntryAIToolbar({
       <button
         type="button"
         onClick={onTranslate}
-        disabled={isTranslating || disabled}
-        title={disabled ? t('entry.configureAIKey') : t('entry.translate')}
+        disabled={isTranslating || translationDisabled}
+        title={
+          translationDisabled ? t('entry.configureAIKey') : t('entry.translate')
+        }
         className={`rounded-lg p-1.5 transition-all duration-150 ${
           showTranslation
             ? 'bg-accent/10 text-accent'
             : 'text-text-secondary hover:bg-surface-secondary hover:text-text dark:text-text-dark-secondary dark:hover:bg-surface-dark-secondary dark:hover:text-text-dark-primary'
-        } ${disabled ? 'cursor-default opacity-30' : ''}`}
+        } ${translationDisabled ? 'cursor-default opacity-30' : ''}`}
       >
         {isTranslating ? (
           <Loader2 size={16} className="text-accent animate-spin" />
@@ -87,7 +94,7 @@ export function EntryAIToolbar({
       <LanguageSelector
         value={translationTargetLanguage}
         onChange={onLanguageChange}
-        disabled={isTranslating || disabled}
+        disabled={isTranslating || translationDisabled}
       />
     </div>
   )
